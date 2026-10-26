@@ -14,7 +14,7 @@ internal sealed class SyntheticPenInput : IPenInputSink
     private int _successfulFrames;
     private bool _injectionFailed;
     private readonly int _creationThreadId = Environment.CurrentManagedThreadId;
-    private long _lastFrameTime;
+    private readonly PenFrameDispatcher _dispatcher = new();
 
     public SyntheticPenInput()
     {
@@ -84,12 +84,20 @@ internal sealed class SyntheticPenInput : IPenInputSink
                 }
             }
         };
+        int error = _dispatcher.Inject(timestamp =>
+        {
+            // 始终使用实际 QPC，不把时间戳递增到当前时间的未来。
+            // dwTime 保持 0；两种时间戳不能同时提供。
+            _buffer[0].Data.Pen.Pointer.PerformanceCount = (ulong)timestamp;
+            return InjectSyntheticPointerInput(_device, _buffer, 1)
+                ? 0 : Marshal.GetLastWin32Error();
+        });
         string description = $"{frame.Action}:flags={flags:X},xy={point.X}/{point.Y}," +
             $"pen={_buffer[0].Data.Pen.PenFlags:X},pressure={_buffer[0].Data.Pen.Pressure}," +
+            $"qpc={_buffer[0].Data.Pen.Pointer.PerformanceCount},gapMs={_dispatcher.LastGapMilliseconds:F3}," +
             $"thread={Environment.CurrentManagedThreadId}";
-        if (!InjectSyntheticPointerInput(_device, _buffer, 1))
+        if (error != 0)
         {
-            int error = Marshal.GetLastWin32Error();
             _injectionFailed = true;
             throw new Win32Exception(error,
                 $"Pen injection failed: Win32={error}, Action={frame.Action}, " +
@@ -98,14 +106,14 @@ internal sealed class SyntheticPenInput : IPenInputSink
                 $"ABI={Marshal.SizeOf<PointerInfo>()}/{Marshal.SizeOf<PointerTypeInfo>()}. " +
                 $"OS={Environment.OSVersion.Version}, SuccessCount={_successfulFrames}, " +
                 $"Threads={_creationThreadId}/{Environment.CurrentManagedThreadId}, " +
-                $"GapMs={(_lastFrameTime == 0 ? -1 : System.Diagnostics.Stopwatch.GetElapsedTime(_lastFrameTime).TotalMilliseconds):F1}, " +
+                $"GapMs={_dispatcher.LastGapMilliseconds:F3}, QPC={_buffer[0].Data.Pen.Pointer.PerformanceCount}, " +
+                $"Retries={_dispatcher.LastRetryCount}, ButtonChange={_buffer[0].Data.Pen.Pointer.ButtonChange}, " +
                 $"Monitor=({monitor.Monitor.Left},{monitor.Monitor.Top},{width},{height}), " +
                 $"LastFrames=[{string.Join("; ", _recentFrames)}]. " +
                 new Win32Exception(error).Message);
         }
         _barrelDown = frame.BarrelDown;
         _successfulFrames++;
-        _lastFrameTime = System.Diagnostics.Stopwatch.GetTimestamp();
         _recentFrames.Enqueue(description);
         if (_recentFrames.Count > 8) _recentFrames.Dequeue();
     }

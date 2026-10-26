@@ -20,3 +20,4 @@ D:\Projects\PointerBridge\PointerBridge_Server\obj\Release\net8.0-windows\Pointe
 D:\Projects\PointerBridge\PointerBridge_Server\obj\Release\net8.0-windows\ref\PointerBridge_Server.dll
 D:\Projects\PointerBridge\PointerBridge_Server\obj\Release\net8.0-windows\DebugWindow.baml
 D:\Projects\PointerBridge\PointerBridge_Server\obj\Release\net8.0-windows\DebugWindow.g.cs
+D:\Projects\PointerBridge\PointerBridge_Server\obj\Release\net8.0-windows\PointerBridge_Server.sourcelink.json
