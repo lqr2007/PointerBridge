@@ -1,0 +1,28 @@
+<!-- 全屏黑色背景；白色 CaptureArea 才是归一化坐标的有效采集区域。 -->
+<Window x:Class="PointerBridge_Client.PointerSensorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PointerSensorWindow"
+        Width="840" Height="600"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        WindowStartupLocation="Manual"
+        Background="Black"
+        Topmost="True"
+        Stylus.IsPressAndHoldEnabled="False"
+        Stylus.IsFlicksEnabled="False"
+        StylusEnter="OnPenInput"
+        StylusLeave="OnPenInput"
+        StylusOutOfRange="OnPenInput"
+        PreviewStylusDown="OnPenInput"
+        PreviewStylusMove="OnPenInput"
+        PreviewStylusInAirMove="OnPenInput"
+        PreviewStylusUp="OnPenInput"
+        PreviewStylusButtonDown="OnPenInput"
+        PreviewStylusButtonUp="OnPenInput">
+    <Grid x:Name="CaptureHost" Background="Black" ClipToBounds="True"
+          SizeChanged="CaptureHost_SizeChanged">
+        <Border x:Name="CaptureArea" Background="White"
+                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </Grid>
+</Window>

@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PointerBridge_Server", "PointerBridge_Server\PointerBridge_Server.csproj", "{3E8C2BB8-1C72-4239-AA41-39FDBCD5756E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PointerBridge_Client", "PointerBridge_Client\PointerBridge_Client.csproj", "{75749B00-6611-4DED-9650-8625AA7C1C9A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3E8C2BB8-1C72-4239-AA41-39FDBCD5756E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E8C2BB8-1C72-4239-AA41-39FDBCD5756E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E8C2BB8-1C72-4239-AA41-39FDBCD5756E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E8C2BB8-1C72-4239-AA41-39FDBCD5756E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{75749B00-6611-4DED-9650-8625AA7C1C9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{75749B00-6611-4DED-9650-8625AA7C1C9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{75749B00-6611-4DED-9650-8625AA7C1C9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{75749B00-6611-4DED-9650-8625AA7C1C9A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D416314F-17A5-45C7-88D4-57B5D47EDCAA}
+	EndGlobalSection
+EndGlobal
