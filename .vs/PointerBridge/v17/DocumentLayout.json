@@ -65,8 +65,7 @@
               "ToolTip": "D:\\Projects\\PointerBridge\\PointerBridge_Client\\PointerSensorWindow.xaml",
               "RelativeToolTip": "PointerBridge_Client\\PointerSensorWindow.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-10-26T07:19:55.435Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T07:19:55.435Z"
             },
             {
               "$type": "Document",
@@ -78,8 +77,7 @@
               "RelativeToolTip": "PointerBridge_Server\\PenReceiveState.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T07:12:37.365Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T07:12:37.365Z"
             },
             {
               "$type": "Document",
@@ -91,8 +89,7 @@
               "RelativeToolTip": "PointerBridge_Server\\PenPacket.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T07:12:35.023Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T07:12:35.023Z"
             },
             {
               "$type": "Document",
@@ -103,8 +100,7 @@
               "ToolTip": "D:\\Projects\\PointerBridge\\PointerBridge_Server\\MainWindow.xaml",
               "RelativeToolTip": "PointerBridge_Server\\MainWindow.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-10-26T07:02:59.843Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T07:02:59.843Z"
             },
             {
               "$type": "Document",
@@ -115,13 +111,12 @@
               "ToolTip": "D:\\Projects\\PointerBridge\\PointerBridge_Client\\MainWindow.xaml",
               "RelativeToolTip": "PointerBridge_Client\\MainWindow.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2026-10-26T05:08:33.244Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T05:08:33.244Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "PointerBridge_Server",
+              "Title": "PointerBridge_Server.csproj",
               "DocumentMoniker": "D:\\Projects\\PointerBridge\\PointerBridge_Server\\PointerBridge_Server.csproj",
               "RelativeDocumentMoniker": "PointerBridge_Server\\PointerBridge_Server.csproj",
               "ToolTip": "D:\\Projects\\PointerBridge\\PointerBridge_Server\\PointerBridge_Server.csproj",
@@ -141,8 +136,7 @@
               "RelativeToolTip": "PointerBridge_Client\\UdpPenSender.cs",
               "ViewState": "AgIAAGcAAAAAAAAAAAAkwJUAAAAlAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T07:00:22.288Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T07:00:22.288Z"
             },
             {
               "$type": "Document",
@@ -154,8 +148,7 @@
               "RelativeToolTip": "PointerBridge_Client\\MainWindow.xaml.cs",
               "ViewState": "AgIAADEAAAAAAAAAAAAYwEoAAABBAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T06:28:22.585Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T06:28:22.585Z"
             },
             {
               "$type": "Document",
@@ -167,8 +160,7 @@
               "RelativeToolTip": "PointerBridge_Client\\DebugWindow.xaml.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAkAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T05:18:47.345Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T05:18:47.345Z"
             },
             {
               "$type": "Document",
@@ -180,8 +172,7 @@
               "RelativeToolTip": "PointerBridge_Client\\PointerSensorWindow.xaml.cs",
               "ViewState": "AgIAAM4AAAAAAAAAAAAQwHcAAAAkAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T05:10:48.401Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T05:10:48.401Z"
             },
             {
               "$type": "Document",
@@ -193,8 +184,7 @@
               "RelativeToolTip": "PointerBridge_Client\\obj\\Debug\\net8.0-windows\\PointerSensorWindow.g.i.cs",
               "ViewState": "AgIAABcAAAAAAAAAAAAqwCoAAAAVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T05:10:52.714Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T05:10:52.714Z"
             }
           ]
         }
