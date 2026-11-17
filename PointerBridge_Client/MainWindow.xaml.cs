@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using PointerBridge;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -26,6 +27,8 @@ namespace PointerBridge_Client
         private UdpPenSender? _penSender;
         private IPEndPoint? _udpRemoteEndPoint;
         private readonly ClientSettingsStore _settingsStore = new();
+        // Suppress recursive changes while initializing or clearing the other input mode.
+        private bool _updatingTargetResolution = true;
         private (PointerSensorWindow? Window, bool HasSample, bool InWindow)? _lastPenDebugState;
         // 修改这里可调整调试信息输出间隔。
         private readonly DispatcherTimer _penDebugTimer = new()
@@ -36,6 +39,7 @@ namespace PointerBridge_Client
         public MainWindow()
         {
             InitializeComponent();
+            _updatingTargetResolution = false;
             TargetIpTextBox.Text = _settingsStore.LoadLastUdpIp() ?? string.Empty;
             _penDebugTimer.Tick += OnPenDebugTimerTick;
             Closed += (_, _) =>
@@ -57,18 +61,81 @@ namespace PointerBridge_Client
 
         private void SAR_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            _pointerSensorWindow?.SetCaptureAspectRatio(GetSelectedAspectRatio());
+            if (_updatingTargetResolution || SAR.SelectedIndex < 0) return;
+
+            _updatingTargetResolution = true;
+            try
+            {
+                TargetWidthTextBox.Clear();
+                TargetHeightTextBox.Clear();
+            }
+            finally
+            {
+                _updatingTargetResolution = false;
+            }
+
+            UpdateCaptureAspectRatio();
         }
 
-        private double GetSelectedAspectRatio() => SAR.SelectedIndex switch
+        private void TargetResolution_TextChanged(object sender, TextChangedEventArgs e)
         {
-            1 => 16.0 / 10.0,
-            2 => 4.0 / 3.0,
-            _ => 16.0 / 9.0
-        };
+            if (_updatingTargetResolution) return;
+
+            _updatingTargetResolution = true;
+            try
+            {
+                SAR.SelectedIndex = -1;
+            }
+            finally
+            {
+                _updatingTargetResolution = false;
+            }
+
+            UpdateCaptureAspectRatio();
+        }
+
+        private static bool TryReadTargetDimension(string text, out int value) =>
+            int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out value)
+            && value > 0;
+
+        private bool TryGetSelectedAspectRatio(out double aspectRatio)
+        {
+            aspectRatio = SAR.SelectedIndex switch
+            {
+                0 => 16.0 / 9.0,
+                1 => 16.0 / 10.0,
+                2 => 4.0 / 3.0,
+                _ => 0
+            };
+            if (aspectRatio > 0) return true;
+
+            if (!TryReadTargetDimension(TargetWidthTextBox.Text, out int width)
+                || !TryReadTargetDimension(TargetHeightTextBox.Text, out int height))
+                return false;
+
+            aspectRatio = (double)width / height;
+            return true;
+        }
+
+        private void UpdateCaptureAspectRatio()
+        {
+            // Keep the existing capture layout until both dimensions are valid.
+            if (TryGetSelectedAspectRatio(out double aspectRatio))
+                _pointerSensorWindow?.SetCaptureAspectRatio(aspectRatio);
+        }
 
         private void Connect(object sender, RoutedEventArgs e)
         {
+            if (!TryGetSelectedAspectRatio(out double aspectRatio))
+            {
+                ShowConnectionError("请选择目标屏幕宽高比，或完整填写目标分辨率的宽和高（均须为正整数像素值）。");
+                if (!TryReadTargetDimension(TargetWidthTextBox.Text, out _))
+                    TargetWidthTextBox.Focus();
+                else
+                    TargetHeightTextBox.Focus();
+                return;
+            }
+
             if (!IPAddress.TryParse(TargetIpTextBox.Text.Trim(), out IPAddress? address)
                 || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any))
             {
@@ -106,32 +173,30 @@ namespace PointerBridge_Client
                 CloseUdpConnection();
                 _udpClient = candidate;
                 _udpRemoteEndPoint = remoteEndPoint;
-                _penSender = new UdpPenSender(candidate, message =>
-                {
-                    if (!Dispatcher.HasShutdownStarted)
-                        Dispatcher.BeginInvoke(new Action(() => _debugWindow?.AppendMessage(message)));
-                });
+                _penSender = new UdpPenSender(candidate, DebugLog.Write);
                 if (_pointerSensorWindow != null)
                     _penSender.Update(_pointerSensorWindow.LatestSample);
-                _debugWindow?.AppendMessage(GetUdpStatus());
+                DebugLog.Write(GetUdpStatus());
             }
             else
             {
-                _debugWindow?.AppendMessage($"复用 UDP 目标 {_udpRemoteEndPoint}（未确认远端在线）。");
+                DebugLog.Write($"复用 UDP 目标 {_udpRemoteEndPoint}（未确认远端在线）。");
             }
+
+            ClientStatusTextBlock.Text = "UDP 目标已设置（未确认远端在线）。";
 
             // 仅保存校验通过且 UDP 已成功初始化的 IP，不保存尚未连接的编辑内容。
             if (!_settingsStore.TrySaveLastUdpIp(address.ToString(), out string? saveError))
             {
                 string message = $"UDP 已初始化，但无法记住本次 IP：{saveError}";
-                _debugWindow?.AppendMessage(message);
-                MessageBox.Show(this, message, "保存地址失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                DebugLog.Write(message, LogLevel.Warning);
+                ClientStatusTextBlock.Text = message;
             }
 
             if (_pointerSensorWindow != null)
             {
                 _pointerSensorWindow.Activate();
-                _debugWindow?.AppendMessage("已激活现有的 PointerSensorWindow。");
+                DebugLog.Write("已激活现有的 PointerSensorWindow。");
                 return;
             }
 
@@ -140,17 +205,17 @@ namespace PointerBridge_Client
                 Owner = this
             };
             _pointerSensorWindow.SampleUpdated += OnPenSampleUpdated;
-            _pointerSensorWindow.SetCaptureAspectRatio(GetSelectedAspectRatio());
+            _pointerSensorWindow.SetCaptureAspectRatio(aspectRatio);
             _pointerSensorWindow.Closed += (_, _) =>
             {
                 if (_pointerSensorWindow != null)
                     _pointerSensorWindow.SampleUpdated -= OnPenSampleUpdated;
                 _pointerSensorWindow = null;
                 CloseUdpConnection();
-                _debugWindow?.AppendMessage("PointerSensorWindow 已关闭。");
+                DebugLog.Write("PointerSensorWindow 已关闭。");
             };
             _pointerSensorWindow.Show();
-            _debugWindow?.AppendMessage($"PointerSensorWindow 已打开，物理像素位置为 " +
+            DebugLog.Write($"PointerSensorWindow 已打开，物理像素位置为 " +
                 $"({_pointerSensorWindow.PixelLeft}, {_pointerSensorWindow.PixelTop})，" +
                 $"全屏尺寸为 {_pointerSensorWindow.PixelWidth} × {_pointerSensorWindow.PixelHeight}，" +
                 $"白色区域比例为 {_pointerSensorWindow.CaptureAspectRatio:F4}。按住侧键悬停 1 秒，再保持接触 1 秒退出。");
@@ -167,7 +232,7 @@ namespace PointerBridge_Client
             _penSender?.Dispose();
             _penSender = null;
             _udpClient = null;
-            _debugWindow?.AppendMessage($"正在释放 UDP 目标 {_udpRemoteEndPoint}，发送最后的抬笔状态。");
+            DebugLog.Write($"正在释放 UDP 目标 {_udpRemoteEndPoint}，发送最后的抬笔状态。");
             _udpRemoteEndPoint = null;
         }
 
@@ -183,8 +248,8 @@ namespace PointerBridge_Client
 
         private void ShowConnectionError(string message)
         {
-            _debugWindow?.AppendMessage($"连接未启动：{message}");
-            MessageBox.Show(this, message, "UDP 连接", MessageBoxButton.OK, MessageBoxImage.Warning);
+            DebugLog.Write($"连接未启动：{message}", LogLevel.Error);
+            ClientStatusTextBlock.Text = message;
         }
 
         private void Debug_Click(object sender, RoutedEventArgs e)
@@ -210,8 +275,8 @@ namespace PointerBridge_Client
                 _debugWindow = null;
             };
             _debugWindow.Show();
-            _debugWindow.AppendMessage("触控笔快照每秒显示一次，等待状态仅提示一次。X/Y 为区域内归一化坐标，压感范围 0～1；侧键未知表示驱动未提供状态。");
-            _debugWindow.AppendMessage(GetUdpStatus());
+            DebugLog.Write("触控笔快照每秒显示一次，等待状态仅提示一次。X/Y 为区域内归一化坐标，压感范围 0～1；侧键未知表示驱动未提供状态。");
+            DebugLog.Write(GetUdpStatus());
             // 新日志窗口应显示一次当前状态，不能沿用上个窗口的去重记录。
             _lastPenDebugState = null;
             OnPenDebugTimerTick(null, EventArgs.Empty);
@@ -238,7 +303,7 @@ namespace PointerBridge_Client
             }
 
             _lastPenDebugState = state;
-            _debugWindow.AppendMessage(_pointerSensorWindow?.GetPenDebugInfo()
+            DebugLog.Write(_pointerSensorWindow?.GetPenDebugInfo()
                 ?? "触控笔：采集窗口未打开。");
         }
 

@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Diagnostics;
 
@@ -59,6 +59,9 @@ internal sealed class UdpListener : IDisposable
                 if (completed == receive)
                 {
                     UdpReceiveResult received = await receive.ConfigureAwait(false);
+                    PenPacket? packet = null;
+                    TimeSpan receivedAt = Stopwatch.GetElapsedTime(0);
+                    bool release = false;
                     lock (_stateGate)
                     {
                         TimeSpan now = Stopwatch.GetElapsedTime(0);
@@ -66,11 +69,18 @@ internal sealed class UdpListener : IDisposable
                         if (_state.Accept(received.Buffer, received.RemoteEndPoint, now))
                         {
                             PenReceiveSnapshot after = _state.Snapshot(now);
-                            if (before.Status == PenReceiveStatus.TimedOut || before.Source != after.Source
-                                || before.Packet?.Session != after.Packet?.Session)
-                                _input?.Release();
-                            _input?.Apply(after.Packet!.Value);
+                            release = before.Status == PenReceiveStatus.TimedOut || before.Source != after.Source
+                                || before.Packet?.Session != after.Packet?.Session;
+                            packet = after.Packet;
                         }
+                    }
+                    // Recovery may retry indefinitely; never hold the snapshot lock
+                    // while injecting, so the UI remains able to stop or exit.
+                    if (packet is PenPacket accepted)
+                    {
+                        if (release) _input?.Release();
+                        if (Stopwatch.GetElapsedTime(0) - receivedAt < TimeSpan.FromSeconds(1))
+                            _input?.Apply(accepted);
                     }
                     receive = _client.ReceiveAsync(token).AsTask();
                 }
@@ -79,11 +89,9 @@ internal sealed class UdpListener : IDisposable
                     await tick.ConfigureAwait(false);
                     tick = timer.WaitForNextTickAsync(token).AsTask();
                 }
-                lock (_stateGate)
-                {
-                    if (_state.Snapshot(Stopwatch.GetElapsedTime(0)).Status == PenReceiveStatus.TimedOut)
-                        _input?.Release();
-                }
+                PenReceiveStatus status;
+                lock (_stateGate) status = _state.Snapshot(Stopwatch.GetElapsedTime(0)).Status;
+                if (status != PenReceiveStatus.Active) _input?.Release();
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -103,11 +111,7 @@ internal sealed class UdpListener : IDisposable
                 try { await tick.ConfigureAwait(false); }
                 catch (OperationCanceledException) { }
             }
-            lock (_stateGate)
-            {
-                try { _input?.Dispose(); }
-                finally { _input = null; }
-            }
+            Interlocked.Exchange(ref _input, null)?.Dispose();
         }
     }
 
@@ -115,15 +119,12 @@ internal sealed class UdpListener : IDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _stop.Cancel();
+        _input?.CancelPending();
         _client.Dispose(); // 立即释放绑定端口，允许再次开始监听。
         try
         {
-            lock (_stateGate)
-            {
-                // 停止按钮/退出不等待下一个数据包或超时 tick 才抬笔。
-                try { _input?.Dispose(); }
-                finally { _input = null; }
-            }
+            // Cancel recovery before joining the injection thread.
+            Interlocked.Exchange(ref _input, null)?.Dispose();
         }
         finally
         {

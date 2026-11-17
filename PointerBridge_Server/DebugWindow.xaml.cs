@@ -1,4 +1,7 @@
+﻿using System;
+using System.Collections.Generic;
 using System.Windows;
+using PointerBridge;
 
 namespace PointerBridge_Server;
 
@@ -8,11 +11,21 @@ public partial class DebugWindow : Window
     public DebugWindow()
     {
         InitializeComponent();
+        foreach (string entry in DebugLog.Entries) AppendEntry(entry);
+        DebugLog.EntryWritten += OnEntryWritten;
+        Closed += (_, _) => DebugLog.EntryWritten -= OnEntryWritten;
     }
 
-    public void AppendMessage(string message)
+    public void AppendMessage(string message, LogLevel level = LogLevel.Info) => DebugLog.Write(message, level);
+
+    private void OnEntryWritten(string entry)
     {
-        string entry = $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}";
+        if (!Dispatcher.HasShutdownStarted)
+            Dispatcher.BeginInvoke(new Action(() => AppendEntry(entry)));
+    }
+
+    private void AppendEntry(string entry)
+    {
         _messages.Enqueue(entry);
         if (_messages.Count > 1000)
         {
@@ -25,6 +38,7 @@ public partial class DebugWindow : Window
 
     private void Clear_Click(object sender, RoutedEventArgs e)
     {
+        DebugLog.Clear();
         _messages.Clear();
         LogTextBox.Clear();
     }

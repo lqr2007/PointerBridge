@@ -1,3 +1,4 @@
+﻿using PointerBridge;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Net.Sockets;
@@ -18,13 +19,13 @@ internal sealed class UdpPenSender : IDisposable
     private readonly SemaphoreSlim _wake = new(0, 1);
     private readonly CancellationTokenSource _stop = new();
     private readonly uint _session = (uint)RandomNumberGenerator.GetInt32(1, int.MaxValue);
-    private readonly Action<string> _reportError;
+    private readonly Action<string, LogLevel> _reportError;
     private PenSample _latest;
     private uint _sequence;
     private bool _disposed;
     internal Task Completion { get; }
 
-    public UdpPenSender(UdpClient client, Action<string> reportError)
+    public UdpPenSender(UdpClient client, Action<string, LogLevel> reportError)
     {
         _client = client;
         _reportError = reportError;
@@ -47,7 +48,7 @@ internal sealed class UdpPenSender : IDisposable
                     // 避免拥塞时无限排队及重放过期轨迹，先释放再同步当前状态。
                     _transitions.Clear();
                     _transitions.Enqueue(_latest.Released);
-                    _reportError("UDP 状态队列拥塞，已丢弃积压状态并安排释放/重新同步。");
+                    _reportError("UDP 状态队列拥塞，已丢弃积压状态并安排释放/重新同步。", LogLevel.Warning);
                 }
                 _transitions.Enqueue(sample);
                 if (_wake.CurrentCount == 0)
@@ -92,7 +93,7 @@ internal sealed class UdpPenSender : IDisposable
                         if (lastErrorTime == 0 || Stopwatch.GetElapsedTime(lastErrorTime).TotalSeconds >= 5)
                         {
                             lastErrorTime = Stopwatch.GetTimestamp();
-                            _reportError($"UDP 发送失败：{ex.Message}");
+                            _reportError($"UDP 发送失败：{ex.Message}；后续心跳将自动重试。", LogLevel.Error);
                         }
                     }
                     lastSendTime = Stopwatch.GetTimestamp();
@@ -108,6 +109,10 @@ internal sealed class UdpPenSender : IDisposable
             }
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            _reportError($"UDP 发送任务发生不可恢复异常：{ex}", LogLevel.Fatal);
+        }
         finally
         {
             // 关闭/换目标时尽力发出释放包；UDP 不保证到达，接收端仍须超时抬笔。

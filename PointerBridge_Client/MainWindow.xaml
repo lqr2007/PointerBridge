@@ -22,7 +22,19 @@
         </Menu>
 
         <WrapPanel Grid.Row="1" Margin="10,5,10,0">
-            <Label Content="目标屏幕宽高比：" VerticalAlignment="Center" FontSize="20"/>
+            <Label Content="目标屏幕分辨率：" VerticalAlignment="Center" FontSize="20"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,5,10,5">
+                <Label Content="宽" VerticalAlignment="Center" Target="{Binding ElementName=TargetWidthTextBox}"/>
+                <TextBox x:Name="TargetWidthTextBox" Width="80" FontSize="15" VerticalAlignment="Center"
+                         ToolTip="目标屏幕宽度（像素，正整数）" AutomationProperties.Name="目标屏幕宽度（像素）"
+                         TextChanged="TargetResolution_TextChanged"/>
+                <Label Content="×" VerticalAlignment="Center"/>
+                <Label Content="高" VerticalAlignment="Center" Target="{Binding ElementName=TargetHeightTextBox}"/>
+                <TextBox x:Name="TargetHeightTextBox" Width="80" FontSize="15" VerticalAlignment="Center"
+                         ToolTip="目标屏幕高度（像素，正整数）" AutomationProperties.Name="目标屏幕高度（像素）"
+                         TextChanged="TargetResolution_TextChanged"/>
+            </StackPanel>
+            <Label Content="或宽高比：" VerticalAlignment="Center"/>
             <ComboBox x:Name="SAR" VerticalAlignment="Center" Width="120" SelectedIndex="0" SelectionChanged="SAR_SelectionChanged">
                 <ComboBoxItem Content="16:9"/>
                 <ComboBoxItem Content="16:10"/>
@@ -41,7 +53,10 @@
             <Button Content="启动连接" VerticalAlignment="Center" Margin="10,5,0,5" FontSize="15" Width="70" Click="Connect"/>
         </WrapPanel>
 
-        <Button Grid.Row="4" Content="退出" HorizontalAlignment="Center"
+        <StackPanel Grid.Row="4">
+            <TextBlock x:Name="ClientStatusTextBlock" Margin="15,8,15,0" TextWrapping="Wrap"/>
+            <Button Content="退出" HorizontalAlignment="Center"
                 Margin="0,15,0,15" FontSize="15" Width="60" Click="Exit"/>
+        </StackPanel>
     </Grid>
 </Window>

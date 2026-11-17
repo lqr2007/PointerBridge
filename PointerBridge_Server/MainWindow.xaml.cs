@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using PointerBridge;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -22,12 +23,19 @@ namespace PointerBridge_Server
     {
         private DebugWindow? _debugWindow;
         private UdpListener? _listener;
+        private int? _desiredPort;
+        private readonly DispatcherTimer _reconnectTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
         private readonly DispatcherTimer _debugTimer = new() { Interval = TimeSpan.FromSeconds(1) };
         private (UdpListener? Listener, PenReceiveStatus? Status, string? Source, uint? Session)? _lastDebugState;
 
         public MainWindow()
         {
             InitializeComponent();
+            _reconnectTimer.Tick += (_, _) =>
+            {
+                _reconnectTimer.Stop();
+                if (_desiredPort is int port) StartListening(port);
+            };
             _debugTimer.Tick += (_, _) => UpdateDebug();
             Closed += (_, _) =>
             {
@@ -38,7 +46,7 @@ namespace PointerBridge_Server
 
         private void Listen_Click(object sender, RoutedEventArgs e)
         {
-            if (_listener != null)
+            if (_desiredPort != null)
             {
                 StopListening();
                 return;
@@ -47,41 +55,49 @@ namespace PointerBridge_Server
             if (!int.TryParse(ListenPortTextBox.Text.Trim(), NumberStyles.None,
                 CultureInfo.InvariantCulture, out int port) || port < 1 || port > 65535)
             {
-                MessageBox.Show(this, "监听端口必须为 1～65535 之间的整数。", "监听端口",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                const string message = "监听端口必须为 1～65535 之间的整数。";
+                DebugLog.Write(message, LogLevel.Warning);
+                ListenStatusTextBlock.Text = message;
                 ListenPortTextBox.Focus();
                 return;
             }
 
+            _desiredPort = port;
+            ListenButton.Content = "结束监听";
+            ListenPortTextBox.IsEnabled = false;
+            StartListening(port);
+        }
+
+        private void StartListening(int port)
+        {
             try
             {
                 _listener = new UdpListener(port, () => new ThreadedPenInput(
-                    () => new SyntheticPenInput(), message =>
-                    {
-                        if (!Dispatcher.HasShutdownStarted)
-                            Dispatcher.BeginInvoke(new Action(() => _debugWindow?.AppendMessage(message)));
-                    }));
+                    () => new SyntheticPenInput(), DebugLog.Write));
             }
-            catch (SocketException ex)
+            catch (Exception ex) when (ex is SocketException or Win32Exception)
             {
-                MessageBox.Show(this, $"无法监听端口 {port}，请检查端口是否已被占用。\n{ex.Message}",
-                    "监听失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ScheduleReconnect($"无法启动监听/笔设备：{ex.Message}");
                 return;
             }
-            catch (Exception ex) when (ex is Win32Exception or PlatformNotSupportedException
-                or EntryPointNotFoundException or DllNotFoundException)
+            catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "虚拟触控笔初始化失败",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                DebugLog.Write($"接收端初始化发生不可恢复错误：{ex}", LogLevel.Fatal);
                 return;
             }
 
-            ListenButton.Content = "结束监听";
-            ListenPortTextBox.IsEnabled = false;
             ListenStatusTextBlock.Text = $"正在监听 UDP 端口 {port}，虚拟触控笔映射到主屏幕（仅用于可信局域网）";
-            _debugWindow?.AppendMessage($"开始监听 UDP 端口 {port}，虚拟触控笔已启用，目标为主屏幕。");
+            DebugLog.Write($"开始监听 UDP 端口 {port}，笔设备支持自动重连，目标为主屏幕。");
             UpdateDebug();
             _ = ObserveListenerAsync(_listener);
+        }
+
+        private void ScheduleReconnect(string message)
+        {
+            DebugLog.Write(message, LogLevel.Error);
+            if (_desiredPort == null) return;
+            ListenStatusTextBlock.Text = $"{message}；正在自动重连（点击结束监听可取消）。";
+            _reconnectTimer.Start();
         }
 
         private async Task ObserveListenerAsync(UdpListener listener)
@@ -89,28 +105,40 @@ namespace PointerBridge_Server
             try
             {
                 await listener.Completion;
+                if (ReferenceEquals(_listener, listener) && _desiredPort != null)
+                {
+                    DisposeListener();
+                    ScheduleReconnect("监听任务已结束。");
+                }
             }
-            catch (Exception ex) when (ex is SocketException or Win32Exception)
+            catch (Exception ex)
             {
-                // 旧监听任务的结束不能影响后来新建的监听。
+                // An old listener must not restart or terminate a newer listener.
                 if (!ReferenceEquals(_listener, listener)) return;
-                StopListening();
-                ListenStatusTextBlock.Text = $"监听已停止：{ex.Message}";
-                _debugWindow?.AppendMessage($"接收/笔注入失败：{ex.Message}");
-                MessageBox.Show(this, ex.Message, "接收/笔注入失败",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                DisposeListener();
+                if (ex is SocketException or Win32Exception)
+                    ScheduleReconnect($"接收/笔注入失败：{ex.Message}");
+                else
+                    DebugLog.Write($"监听任务发生不可恢复错误：{ex}", LogLevel.Fatal);
             }
         }
 
-        private void StopListening()
+        private void DisposeListener()
         {
             UdpListener? listener = _listener;
             _listener = null;
             try { listener?.Dispose(); }
             catch (Win32Exception ex)
             {
-                _debugWindow?.AppendMessage($"释放触控笔失败，已销毁合成设备：{ex.Message}");
+                DebugLog.Write($"释放触控笔失败，已销毁合成设备：{ex.Message}", LogLevel.Error);
             }
+        }
+
+        private void StopListening()
+        {
+            _desiredPort = null;
+            _reconnectTimer.Stop();
+            DisposeListener();
             ListenButton.Content = "开始监听";
             ListenPortTextBox.IsEnabled = true;
             ListenStatusTextBlock.Text = "未监听";
@@ -134,7 +162,7 @@ namespace PointerBridge_Server
                 _debugWindow = null;
             };
             _debugWindow.Show();
-            _debugWindow.AppendMessage("笔状态每秒显示一次，等待/离开/超时仅在状态改变时提示。X/Y、压感范围 0～1；侧键未知表示发送端未提供状态。");
+            DebugLog.Write("笔状态每秒显示一次，等待/离开/超时仅在状态改变时提示。X/Y、压感范围 0～1；侧键未知表示发送端未提供状态。");
             _lastDebugState = null;
             UpdateDebug();
             _debugTimer.Start();
@@ -151,10 +179,11 @@ namespace PointerBridge_Server
 
             if (changed && snapshot?.Source != null
                 && (_lastDebugState?.Source != state.Source || _lastDebugState?.Session != state.Session))
-                _debugWindow.AppendMessage($"接收来源 {snapshot.Source}，会话 {snapshot.Packet!.Value.Session:X8}。");
+                DebugLog.Write($"接收来源 {snapshot.Source}，会话 {snapshot.Packet!.Value.Session:X8}。");
 
             _lastDebugState = state;
-            _debugWindow.AppendMessage(snapshot?.FormatDebug() ?? "UDP：未监听。");
+            DebugLog.Write(snapshot?.FormatDebug() ?? "UDP：未监听。",
+                snapshot?.Status == PenReceiveStatus.TimedOut ? LogLevel.Warning : LogLevel.Info);
         }
 
         private void About_Click(object sender, RoutedEventArgs e)

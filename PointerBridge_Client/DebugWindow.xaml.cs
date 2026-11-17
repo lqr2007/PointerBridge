@@ -1,44 +1,45 @@
+﻿using System;
+using System.Collections.Generic;
 using System.Windows;
+using PointerBridge;
 
-namespace PointerBridge_Client
+namespace PointerBridge_Client;
+
+public partial class DebugWindow : Window
 {
-    public partial class DebugWindow : Window
+    private readonly Queue<string> _messages = new();
+    public DebugWindow()
     {
-        private const int MaxMessages = 1000;
-        private readonly Queue<string> _messages = new();
+        InitializeComponent();
+        foreach (string entry in DebugLog.Entries) AppendEntry(entry);
+        DebugLog.EntryWritten += OnEntryWritten;
+        Closed += (_, _) => DebugLog.EntryWritten -= OnEntryWritten;
+    }
 
-        public DebugWindow()
+    public void AppendMessage(string message, LogLevel level = LogLevel.Info) => DebugLog.Write(message, level);
+
+    private void OnEntryWritten(string entry)
+    {
+        if (!Dispatcher.HasShutdownStarted)
+            Dispatcher.BeginInvoke(new Action(() => AppendEntry(entry)));
+    }
+
+    private void AppendEntry(string entry)
+    {
+        _messages.Enqueue(entry);
+        if (_messages.Count > 1000)
         {
-            InitializeComponent();
+            _messages.Dequeue();
+            LogTextBox.Text = string.Concat(_messages);
         }
+        else LogTextBox.AppendText(entry);
+        LogTextBox.ScrollToEnd();
+    }
 
-        public void AppendMessage(string message)
-        {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.BeginInvoke(new Action(() => AppendMessage(message)));
-                return;
-            }
-
-            string entry = $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}";
-            _messages.Enqueue(entry);
-            if (_messages.Count > MaxMessages)
-            {
-                _messages.Dequeue();
-                LogTextBox.Text = string.Concat(_messages);
-            }
-            else
-            {
-                LogTextBox.AppendText(entry);
-            }
-
-            LogTextBox.ScrollToEnd();
-        }
-
-        private void Clear_Click(object sender, RoutedEventArgs e)
-        {
-            _messages.Clear();
-            LogTextBox.Clear();
-        }
+    private void Clear_Click(object sender, RoutedEventArgs e)
+    {
+        DebugLog.Clear();
+        _messages.Clear();
+        LogTextBox.Clear();
     }
 }

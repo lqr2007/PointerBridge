@@ -4,11 +4,19 @@ internal interface IPenInputSink : IDisposable
 {
     void Apply(PenPacket packet);
     void Release();
+    void CancelPending() { }
 }
 
 internal enum PenAction { Enter, Down, Update, Up, Leave }
 internal readonly record struct PenFrame(PenAction Action, ushort X, ushort Y,
-    ushort Pressure, bool Contact, bool Eraser, bool BarrelDown);
+    ushort Pressure, bool Contact, bool Eraser, bool BarrelDown)
+{
+    // INVERTED (0x2) identifies the eraser end even while hovering.
+    // ERASER (0x4) means that end is pressed, so clear it on hover/UP/LEAVE.
+    internal uint NativePenFlags =>
+        (Eraser ? 0x2u : 0u) | (Eraser && Contact ? 0x4u : 0u)
+        | (BarrelDown ? 0x1u : 0u);
+}
 
 // 不依赖 Win32 的状态机，可用假注入器测试，不操作本机指针。
 internal sealed class PenInjectionState(Action<PenFrame> inject)

@@ -9,4 +9,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\DebugLog.cs" Link="DebugLog.cs" />
+  </ItemGroup>
+
 </Project>

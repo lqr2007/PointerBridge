@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Shared/DebugLog.cs" Link="DebugLog.cs" />
+    <Compile Include="../../PointerBridge_Server/ThreadedPenInput.cs" Link="ThreadedPenInput.cs" />
+    <Compile Include="../../PointerBridge_Server/PenInjectionState.cs" Link="PenInjectionState.cs" />
+    <Compile Include="../../PointerBridge_Server/PenPacket.cs" Link="PenPacket.cs" />
+    <Compile Include="../../PointerBridge_Server/PenReceiveState.cs" Link="PenReceiveState.cs" />
+    <Compile Include="../../PointerBridge_Server/UdpListener.cs" Link="UdpListener.cs" />
+    <Compile Include="../../PointerBridge_Client/UdpPenSender.cs" Link="UdpPenSender.cs" />
+    <Compile Include="../../PointerBridge_Client/PenSample.cs" Link="PenSample.cs" />
+  </ItemGroup>
+</Project>

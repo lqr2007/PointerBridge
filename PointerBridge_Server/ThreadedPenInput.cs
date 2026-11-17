@@ -1,25 +1,24 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
+using PointerBridge;
 
 namespace PointerBridge_Server;
 
-// 一个设备的整个生命周期固定到一个线程，避免 async 接收线程池切换。
-// 同步确认每次命令，无额外轨迹积压；调用方仍是后台 UDP 接收循环。
+// Create, inject, recover and destroy a device on the same dedicated thread.
 internal sealed class ThreadedPenInput : IPenInputSink
 {
     private readonly BlockingCollection<Action> _commands = new(16);
     private readonly object _lifecycle = new();
     private readonly Thread _thread;
     private readonly Func<IPenInputSink> _create;
-    private readonly Action<string> _report;
+    private readonly Action<string, LogLevel> _report;
     private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly Queue<long> _recoveries = new();
+    private readonly CancellationTokenSource _stop = new();
     private IPenInputSink? _input;
-    private bool _contact;
     private bool _disposed;
 
-    public ThreadedPenInput(Func<IPenInputSink> create, Action<string> report)
+    public ThreadedPenInput(Func<IPenInputSink> create, Action<string, LogLevel> report)
     {
         _create = create;
         _report = report;
@@ -30,6 +29,7 @@ internal sealed class ThreadedPenInput : IPenInputSink
         {
             _thread.Join();
             _commands.Dispose();
+            _stop.Dispose();
             throw;
         }
     }
@@ -38,7 +38,13 @@ internal sealed class ThreadedPenInput : IPenInputSink
     {
         try
         {
-            _input = _create();
+            // Do not block the UI if device creation itself returns Win32 87.
+            // The first input/release command will retry creation in the background.
+            try { _input = _create(); }
+            catch (Win32Exception ex)
+            {
+                _report($"笔设备初始化失败，将自动重连：{ex.Message}", LogLevel.Error);
+            }
             _started.SetResult();
         }
         catch (Exception ex)
@@ -72,42 +78,63 @@ internal sealed class ThreadedPenInput : IPenInputSink
         completion.GetAwaiter().GetResult();
     }
 
-    public void Apply(PenPacket packet) => Invoke(() =>
+    private void DestroyDevice()
     {
-        try { _input!.Apply(packet); }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == 87
-            && packet.InRange && !packet.Contact && !_contact && CanRecover())
+        IPenInputSink? old = _input;
+        _input = null;
+        try { old?.Dispose(); }
+        catch (Win32Exception ex)
         {
-            // 仅恢复纯悬空，不重试 DOWN/接触，不伪装成已修复的正常更新。
-            _recoveries.Enqueue(Stopwatch.GetTimestamp());
-            _report($"悬空注入异常，尝试重建笔设备（最近一分钟 {_recoveries.Count}/3 次）：{ex.Message}");
-            try { _input!.Dispose(); }
-            catch (Win32Exception cleanup) { _report($"旧笔设备清理异常：{cleanup.Message}"); }
-            _input = null;
-            _input = _create();
-            try { _input.Apply(packet); }
-            catch (Win32Exception retry)
-            {
-                throw new Win32Exception(retry.NativeErrorCode,
-                    $"悬空恢复失败，停止监听。首次错误：{ex.Message}；重试错误：{retry.Message}");
-            }
-            _report("合成笔设备重建成功，已恢复悬空输入。");
+            _report($"旧笔设备清理失败，已放弃旧设备：{ex.Message}", LogLevel.Error);
         }
-        _contact = packet.InRange && packet.Contact;
-    });
-
-    private bool CanRecover()
-    {
-        while (_recoveries.TryPeek(out long time) && Stopwatch.GetElapsedTime(time).TotalMinutes >= 1)
-            _recoveries.Dequeue();
-        return _recoveries.Count < 3;
     }
 
-    public void Release() => Invoke(() =>
+    private void ExecuteWithRecovery(Action<IPenInputSink> action, bool expires = false)
     {
-        _input?.Release();
-        _contact = false;
-    });
+        bool recovering = _input == null;
+        long started = Stopwatch.GetTimestamp();
+        while (!_stop.IsCancellationRequested)
+        {
+            try
+            {
+                _input ??= _create();
+                // Never replay a stale DOWN after a long reconnect; the next UDP
+                // packet/heartbeat will synchronize the current pen state instead.
+                if (expires && recovering && Stopwatch.GetElapsedTime(started).TotalSeconds >= 1)
+                {
+                    _report("笔设备已重连；已丢弃过期笔状态，等待最新数据同步。", LogLevel.Warning);
+                    return;
+                }
+                action(_input);
+                if (recovering) _report("笔设备自动重连成功，已恢复输入。", LogLevel.Info);
+                return;
+            }
+            catch (Win32Exception ex)
+            {
+                // Includes DOWN/UPDATE/UP/LEAVE, release, and recreation failures.
+                // No hover-only guard, retry limit, or rate-based escalation to Fatal.
+                _report($"笔注入/设备错误，正在自动重连：{ex.Message}", LogLevel.Error);
+                recovering = true;
+                DestroyDevice();
+                if (_stop.Token.WaitHandle.WaitOne(TimeSpan.FromMilliseconds(250))) return;
+            }
+        }
+    }
+
+    public void Apply(PenPacket packet) => Invoke(() =>
+        ExecuteWithRecovery(input => input.Apply(packet), expires: true));
+
+    public void Release() => Invoke(() => ExecuteWithRecovery(input => input.Release()));
+
+    // Cancellation must precede queued disposal, otherwise a permanent
+    // Win32 87 would deadlock Stop/Exit behind recovery.
+    public void CancelPending()
+    {
+        lock (_lifecycle)
+        {
+            if (!_disposed) _stop.Cancel();
+        }
+    }
 
     public void Dispose()
     {
@@ -116,11 +143,8 @@ internal sealed class ThreadedPenInput : IPenInputSink
         {
             if (_disposed) return;
             _disposed = true;
-            completion = QueueCommand(() =>
-            {
-                try { _input?.Dispose(); }
-                finally { _input = null; }
-            });
+            _stop.Cancel();
+            completion = QueueCommand(DestroyDevice);
             _commands.CompleteAdding();
         }
         try { completion.GetAwaiter().GetResult(); }
@@ -128,6 +152,7 @@ internal sealed class ThreadedPenInput : IPenInputSink
         {
             _thread.Join();
             _commands.Dispose();
+            _stop.Dispose();
         }
     }
 }

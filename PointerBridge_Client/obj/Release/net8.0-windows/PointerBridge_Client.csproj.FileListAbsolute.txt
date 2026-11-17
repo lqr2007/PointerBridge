@@ -22,3 +22,4 @@ D:\Projects\PointerBridge\PointerBridge_Client\obj\Release\net8.0-windows\refint
 D:\Projects\PointerBridge\PointerBridge_Client\obj\Release\net8.0-windows\PointerBridge_Client.pdb
 D:\Projects\PointerBridge\PointerBridge_Client\obj\Release\net8.0-windows\PointerBridge_Client.genruntimeconfig.cache
 D:\Projects\PointerBridge\PointerBridge_Client\obj\Release\net8.0-windows\ref\PointerBridge_Client.dll
+D:\Projects\PointerBridge\PointerBridge_Client\obj\Release\net8.0-windows\PointerBridge_Client.sourcelink.json

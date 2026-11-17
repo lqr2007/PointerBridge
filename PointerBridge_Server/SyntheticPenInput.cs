@@ -78,7 +78,7 @@ internal sealed class SyntheticPenInput : IPenInputSink
                             : frame.Action == PenAction.Up ? 2u
                             : frame.BarrelDown != _barrelDown ? (frame.BarrelDown ? 3u : 4u) : 0u
                     },
-                    PenFlags = (frame.Eraser ? 0x2u | 0x4u : 0u) | (frame.BarrelDown ? 1u : 0u),
+                    PenFlags = frame.NativePenFlags,
                     PenMask = 1, // PEN_MASK_PRESSURE；未传输倾斜/旋转，不伪造有效值。
                     Pressure = frame.Contact ? (uint)Math.Round(frame.Pressure / 65535.0 * 1024) : 0
                 }

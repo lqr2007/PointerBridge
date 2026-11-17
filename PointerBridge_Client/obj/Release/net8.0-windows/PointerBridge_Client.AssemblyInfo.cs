@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PointerBridge_Client")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4ee1a2782b02f33720cdfa9dcbe6ef12a98dac5a")]
 [assembly: System.Reflection.AssemblyProductAttribute("PointerBridge_Client")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PointerBridge_Client")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
